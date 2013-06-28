@@ -55,7 +55,7 @@ passing in an object with the following values set. Any value not set will use t
 	<script type="text/javascript" src="http://itsablizzardoutthere.com/snowfall.stable.js"></script>
 	<script type="text/javascript">
 		// The following options will draw a maximum of 2000 snowflakes, and not pause when
-		// the window looses focus
+		// the window loses focus
 		Snowfall.setOptions({
 				max : 2000,
 				pauseBlur : false
