@@ -20,6 +20,57 @@
   *
   **/
 (function () {
+	
+	/**	OPTIONS
+	  *	This is a list of all options available and what they do
+	  *	
+	  *	SNOWFLAKES
+	  *		"total"     (INT) : Total number of flakes to draw. Overrides min, and max.
+	  *		"min"       (INT) : Minimum number of flakes to draw. Overriden by total and minFPS (DEFAULT 0)
+	  *		"max"       (INT) : Maximum number of flakes to draw. Overriden by total. (DEFAULT Infinity)
+	  *		"starting"  (INT) : Number of flakes to start with. (DEFAULT 10)
+	  *		"lock"      (BOL) : Lock the number drawn to the value current number. (DEFAULT false)
+	  *		"pileUp"    (BOL) : Pile up the flakes at the bottom of the screen. (DEFAULT true)
+	  *		"sizes"     (INT) : Number of sizes to use when drawing the flakes. (DEFAULT 3)
+	  *	
+	  *	SPEED
+	  *		"FPS"       (INT) : Number of frames per second to draw at. Overrides minFPS, and maxFPS.
+	  *		"minFPS"    (INT) : Minimum number of frames per second to draw at. Overriden by FPS, overrides min. (DEFAULT 0)
+	  *		"maxFPS"    (INT) : Maximum number of frames per second to draw at. Overriden by FPS. (DEFAULT 60)
+	  *		"pauseBlur" (BOL) : Pause when the window looses focus. (DEFAULT true)
+	  *	
+	  *	CONTROLS
+	  *		NO ACTIVE OPTIONS YET
+	  *	
+	  *	Debug
+	  *		"showFPS"   (BOL) : Show the frames per second on the page. (DEFAULT false)
+	  *		"logTiming" (BOL) : Log the timing of drawing to the console. `console.log` is assumed. (DEFAULT false)
+	  *	
+	  **/
+	
+	var DEFAULTS = {
+			// Snowflakes
+			"min"       : 0,
+			"max"       : Infinity,
+			"starting"  : 10,
+			"lock"      : false,
+			"pileUp"    : true,
+			"sizes"     : 3,
+			
+			// Speed
+			"minFPS"    : 1000 / 30,
+			"maxFPS"    : 1000 / 60,
+			"pauseBlur" : true,
+			
+			// Controls
+			// To Be Added
+			
+			// Debug
+			"showFPS"   : false,
+			"logTiming" : false
+		},
+		options = merge({}, DEFAULTS);
+	
 	// Document.getElementById shortcut
 	function $(id, context) {
 		return (context || document).getElementById(id);
@@ -56,6 +107,29 @@
 		var tarea = $create('textarea');
 		tarea.innerHTML = str;
 		return tarea.value;
+	}
+	// Merge properties from object 2 into ojbect 1
+	function merge(obj1, obj2) {
+		if(!obj1)
+			obj1 = {};
+		if(!obj2)
+			return obj1;
+		
+		for(var k in obj2) {
+			if(Object.prototype.hasOwnProperty.call(obj2, k)) {
+				obj1[k] = obj2[k];
+			}
+		}
+		return obj1;
+	}
+	// Get value within bounds
+	function bounds(low, val, high) {
+		if(val == Infinity)
+			return high;
+		else if (val == -Infinity)
+			return low;
+		else
+			return Math.max(low, Math.min(val, high));
 	}
 	// https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Array/indexOf
 	if (!Array.prototype.indexOf) {
@@ -97,11 +171,10 @@
 		this.speed = Math.random() * 150+ 20,
 		this.arcpace = Math.random() *20 + 10,
 		this.arcwidth = Math.random() * 50 + 50,
-		this.distance = Math.floor(Math.random()*4+1), // "Distance" from the screen
+		this.distance = Math.floor(Math.random()*(options.sizes)+1), // "Distance" from the screen
 		this.x = left,
 		this.scene = scene;
 		
-		//this.fillStyle = "#"+rgb.toString(16)+rgb.toString(16)+rgb.toString(16);
 		this._rendered = Snowflake.flake_render(this.distance);
 	}
 	var FLAKE_CACHE = [],
@@ -128,11 +201,10 @@
 	Snowflake.prototype.fall = function () {
 		var ctx = this.scene.context,
 			radius = this.distance/2;
-		// ctx.fillStyle = this.fillStyle;
-		// ctx.beginPath();
 		var newLocation = this.x+Math.sin((this.arcplace)/(this.arcwidth))*this.arcpace;
 		if((this.y+=this.speed/80) > this.scene.canvas.height - this.scene.snowpile.getHeight(newLocation + (this.distance / 2))) {
-			this.scene.snowpile.addToPile(this);
+			if(options.pileUp)
+				this.scene.snowpile.addToPile(this);
 			if(this.scene.deleteCount>0) {
 				this.scene.removeFlake(this);
 				return false;
@@ -144,10 +216,7 @@
 		}
 		this.y += this.speed / 80;
 		ctx.drawImage(this._rendered, newLocation - radius, this.y - radius); 
-		//ctx.arc(newLocation,this.y+=this.speed/80,this.distance / 2,0,Math.PI*2,false);
 		this.arcplace++;
-		// ctx.closePath();
-		// ctx.fill();
 	}
 
 	function SnowPile (scene) {
@@ -235,13 +304,13 @@
 		delete this.pile;
 	}
 
-	function Scene(el, notchanged) {
+	function Scene(el) {
 		// Init
 		var SR = this;
 		this.e_height = el == document.body ? Math.max(el.offsetHeight, window.innerHeight) : el.offsetHeight,
 		this.e_width = el.offsetWidth,
 		this._el = el,
-		this.flakeCount = 10,
+		this.flakeCount = options.starting,
 		this.deleteCount = 0,
 		this.iterationCheck = 20,
 		this._paused = true,
@@ -292,32 +361,34 @@
 				var diff = new Date() - start;
 				totaldiff += diff;
 				
-				if(stepcount % self.iterationCheck == 0) {
+				if(!options.lock && stepcount % self.iterationCheck == 0) {
 					
 					var avg = totaldiff / self.iterationCheck;
 					totaldiff = 0;
 					if($count) $count.innerHTML = (self.flakeCount - self.deleteCount)+' snowflakes drawn about every '+avg+'ms';
 					
-					if(avg <= 16.0) {
+					if(avg <= options.maxFPS + ((options.minFPS - options.maxFPS) / 2)) {
 						// Going really fast, lets add a couple flakes
-						self.flakeCount += 20;
-						for(var s = 0; s < 20; s++) {
+						var addit = bounds(0, options.max - self.flakeCount, 20)
+						self.flakeCount += addit;
+						for(var s = 0; s < addit; s++) {
 							var sn = new Snowflake(Math.random()*self.e_width, 0,self);
 							self.snowflakes.push(sn);
 						}
-						self.deleteCount=0;
-					} else if(avg < 25.0) {
+						self.deleteCount = bounds(0, -1 * (options.max - self.flakeCount), 10);
+					} else if(avg < options.maxFPS + ((options.minFPS - options.maxFPS) * .75)) {
 						// Going between 60 and 30 fps, a good speed, but lets push it and add a couple more
-						self.flakeCount += 10;
-						for(var s = 0; s < 10; s++) {
+						var addit = bounds(0, options.max - self.flakeCount, 10);
+						self.flakeCount += addit;
+						for(var s = 0; s < addit; s++) {
 							var sn = new Snowflake(Math.random()*self.e_width, 0,self);
 							self.snowflakes.push(sn);
 						}
-						self.deleteCount=0;
+						self.deleteCount = bounds(0, -1 * (options.max - self.flakeCount), 10);
 						//next();
-					} else if(avg <= 30.0) {
+					} else if(avg <= options.minFPS) {
 						//We're around 30 fps, just go to the next frame
-					} else if(avg <= 40.0) {
+					} else if(avg <= options.minFPS * 1.25) {
 						// We're going a little slow, lets mark some to be removed
 						self.deleteCount += 5;
 					} else {
@@ -330,18 +401,16 @@
 			};
 		
 		next();
-		// this.timer = setInterval(function () {
-			// self.step();
-		// }, typeof G_vmlCanvasManager != 'undefined' && notchanged ? 100 : $('speed') ? $('speed').value : 33);
 		return this;
 	};
 	Scene.prototype.resize = function () {
 		this.pause(),
+		
+		// Now resize
 		this.e_height = this._el == document.body ? Math.max(this._el.offsetHeight, window.innerHeight) : this._el.offsetHeight,
 		this.e_width = this._el.offsetWidth,
 		this.canvas.height = this.e_height,
 		this.canvas.width = this.e_width;
-		//this.flakeCount = $('snowflakes') ? $('snowflakes').value : 500;
 		
 		for(var s in this.snowflakes)
 			delete this.snowflakes[s];
@@ -387,32 +456,7 @@
 		
 		window[addEvent](prefix+'load', function () {
 			
-			$c_flake = $('snowflakes'),
-			$c_speed = $('speed'),
-			$hide    = $('hide');
-			
-			scene = new Scene(document.body, 
-					typeof G_vmlCanvasManager != 'undefined' && notchanged ?
-						10 : $c_flake ? $c_flake.value : 500, notchanged);
-			
-			// TODO
-			if($c_flake)
-				$c_flake[addEvent](prefix+'change', function(e) {
-					notchanged = false;
-					scene.pause().resize().play();
-				});
-			if($c_speed)
-				$('speed')[addEvent](prefix+'change', function(e) {
-					notchanged = false;
-					scene.pause().play();
-				});
-			if($hide)
-				$('hide')[addEvent](prefix+'click', function(e) {
-					$('window_hide').style.display = 'none';
-					e.preventDefault();
-					e.stopPropagation();
-					return false;
-				});
+			scene = new Scene(document.body);
 			
 		}, false);
 		
@@ -421,7 +465,7 @@
 		}, false);
 		
 		window[addEvent](prefix+'blur', function () {
-			if(scene) {
+			if(scene && options.pauseBlur) {
 				scene.pause();
 				
 				var focusFunc = function () {
@@ -434,5 +478,38 @@
 		}, false);
 		
 	}
-
+	
+	window.Snowfall = {
+		setOptions: function (opts) {
+			options = merge({}, DEFAULTS);
+			options = merge(options, opts);
+			
+			if(options.total) {
+				options.max = options.total;
+				options.min = options.starting;
+				options.lock = options.starting == options.total;
+			}
+			
+			if(options.FPS) {
+				options.minFPS = options.FPS;
+				options.maxFPS = options.FPS;
+			}
+			// Conver FPS to usable vals
+			options.minFPS = 1000 / options.minFPS;
+			options.maxFPS = 1000 / options.maxFPS;
+		},
+		pause: function () {
+			if(scene)
+				scene.pause();
+		},
+		play: function () {
+			if(scene)
+				scene.play();
+		},
+		resize: function () {
+			if(scene)
+				scene.resize();
+		}
+	};
+	
 })();
