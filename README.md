@@ -8,7 +8,7 @@ There are two ways you can make your pages snow. If you'd like your site
 to always use the most up to date version, you can include the following
 script snippet on your page.
 
-    <script type="text/javascript" src="http://itsablizzardoutthere.com/snowfall.stable.js"></script>
+	<script type="text/javascript" src="http://itsablizzardoutthere.com/snowfall.stable.js"></script>
 
 The second method is to download the script from this page an include it
 on your page.
@@ -26,7 +26,8 @@ IE 7 and 8 are compatible using [explorercanvas from Google](http://code.google.
 
 ## Configuration options
 
-This is a list of all options available and what they do
+This is a list of all options available and what they do. Options are set by calling `Snowfall.setOptions`, and
+passing in an object with the following values set. Any value not set will use the default.
 
 ### Snowflakes
 	"total"     (INT) : Total number of flakes to draw. Overrides min, and max.
@@ -48,6 +49,18 @@ This is a list of all options available and what they do
 
 ### Debugging
 	NO ACTIVE OPTIONS YET
+
+## Example
+
+	<script type="text/javascript" src="http://itsablizzardoutthere.com/snowfall.stable.js"></script>
+	<script type="text/javascript">
+		// The following options will draw a maximum of 2000 snowflakes, and not pause when
+		// the window looses focus
+		Snowfall.setOptions({
+				max : 2000,
+				pauseBlur : false
+			});
+	</script>
 
 ## License
 
