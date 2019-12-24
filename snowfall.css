@@ -1,0 +1,94 @@
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	background-color: #102d3a;
+	color: #ffffff;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+		Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+		"Segoe UI Symbol";
+	height: 100vh;
+	margin: 0px;
+	min-height: 580px;
+	min-width: 720px;
+	padding: 0px;
+	width: 100vw;
+}
+
+header {
+	background-color: rgba(0, 0, 0, 0.5);
+	display: flex;
+	flex-direction: column;
+	margin: auto;
+	max-width: 400px;
+	padding: 10px;
+	position: relative;
+	z-index: 40;
+}
+h1 {
+	font-size: 10px;
+	font-weight: 900;
+	margin: 0px 0px 5px;
+	padding: 0px;
+	text-transform: uppercase;
+}
+p {
+	color: rgba(240, 240, 240, 0.8);
+	font-size: 14px;
+	line-height: 28px;
+	margin: 0px;
+	padding: 0px 15px 15px;
+}
+button {
+	background: transparent;
+	border: none;
+	color: #ffffff;
+	cursor: pointer;
+	display: block;
+	font-family: sans-serif;
+	padding: 10px;
+	text-decoration: none;
+}
+button:active,
+button:focus,
+button:hover {
+	background: rgba(240, 240, 240, 0.3);
+}
+
+footer {
+	font-size: 12px;
+	margin: auto;
+	max-width: 400px;
+	padding: 10px 5px;
+	position: relative;
+	text-align: center;
+	z-index: 41;
+}
+footer:first-child {
+	background-color: rgba(0, 0, 0, 0.7);
+	margin-right: 0px;
+}
+footer:hover {
+	background-color: rgba(0, 0, 0, 0.7);
+}
+footer p {
+	font-size: 12px;
+	line-height: 1;
+	padding: 0px;
+}
+a {
+	color: #ffffff;
+	margin: 0px 2px;
+	padding: 0px 2px;
+}
+a:active,
+a:focus,
+a:hover {
+	background-color: #ffffff;
+	color: rgba(0, 0, 0, 0.9);
+}
+.love {
+	color: red;
+}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>Be Careful, It's a Blizzard Out There!</title>
+
+		<link rel="stylesheet" type="text/css" href="snowfall.css" />
+		<script type="text/javascript" src="snowfall.js"></script>
+	</head>
+
+	<body>
+		<header id="window_hide">
+			<h1>It's Snowing!</h1>
+
+			<p>
+				While this may seem like a peaceful scene at first, you should
+				be careful because <em>it's a blizzard out there</em>.
+			</p>
+
+			<button type="button" id="hide">Hide this message</button>
+		</header>
+
+		<footer>
+			<p>
+				Made with <span class="love">❤️</span> by
+				<a href="https://imgineme.com" rel="author" target="_blank"
+					>LoveAndCoding</a
+				>
+				&mdash; Code available on
+				<a
+					href="https://github.com/LoveAndCoding/blizzard"
+					target="_blank"
+					>GitHub</a
+				>
+			</p>
+		</footer>
+
+		<script type="text/javascript">
+			// Do this listener here because it is small and not a big deal
+			document.getElementById("hide").addEventListener("click", () => {
+				document.getElementById("window_hide").remove();
+			});
+		</script>
+	</body>
+</html>
