@@ -78,7 +78,16 @@
 		else return Math.max(low, Math.min(val, high));
 	}
 
+	/**
+	 * An individual tiny little snowflake. Just one though. To make it snow, we
+	 * need lots of these.
+	 */
 	class Snowflake {
+		/**
+		 * Get the cached render of a single snowflake
+		 *
+		 * @param {number} size Size (or distance) of the snowflake
+		 */
 		static flakeRender(size) {
 			if (FLAKE_CACHE[size]) return FLAKE_CACHE[size];
 
@@ -114,9 +123,13 @@
 			this.arcLocation = this.calculateArcLocation();
 			this.scene = scene;
 
+			// Cache a rendered copy of the snowflake
 			this._rendered = Snowflake.flakeRender(this.distance);
 		}
 
+		/**
+		 * Draws the snowflake at it's currently calculated position
+		 */
 		draw() {
 			const radius = this.distance / 2;
 			this.scene.context.drawImage(
@@ -126,12 +139,20 @@
 			);
 		}
 
+		/**
+		 * Find out where in our arc pattern we are (i.e. what X should be)
+		 */
 		calculateArcLocation() {
 			return (
 				this.x + Math.sin(this.arcplace / this.arcwidth) * this.arcpace
 			);
 		}
 
+		/**
+		 * Figure out if we've hit the ground at our current position
+		 *
+		 * @param {number} arcLocation Precomputed x-location
+		 */
 		willHitGround(arcLocation) {
 			const groundHeight =
 				this.scene.canvas.height -
@@ -139,6 +160,11 @@
 			return this.y > groundHeight;
 		}
 
+		/**
+		 * A.K.A. Tick
+		 *
+		 * This moves our animation forward one.
+		 */
 		fall() {
 			const ctx = this.scene.context;
 			const radius = this.distance / 2;
@@ -166,6 +192,9 @@
 		}
 	}
 
+	/**
+	 * Our pile of snow that builds up along the bottom
+	 */
 	class SnowPile {
 		constructor(scene) {
 			this.offset =
@@ -182,10 +211,18 @@
 			this.reset(scene);
 		}
 
+		/**
+		 * Quick helper function to get the height at a specific x-coord
+		 *
+		 * @param {number} x X-coord to get the height at
+		 */
 		getHeight(x) {
 			return x ? this.pile[Math.floor(x)] : this.maxHeight;
 		}
 
+		/**
+		 * Draw the snowpile along the bottom
+		 */
 		draw() {
 			this.canvas.height = Math.ceil(this.maxHeight) + 1;
 			this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -206,6 +243,13 @@
 			this.ctx.fill();
 		}
 
+		/**
+		 * "Impact" a snowflake with our pile at it's current position. This
+		 * will cause a bit of normailzation of the pile, but does not cause
+		 * the pile to redraw.
+		 *
+		 * @param {Snowflake} flake the flake that we're adding
+		 */
 		addToPile(flake) {
 			const floored = Math.floor(flake.x);
 			for (let d = -flake.distance, dl = flake.distance; d <= dl; d++) {
@@ -278,6 +322,11 @@
 			}
 		}
 
+		/**
+		 * Reset the current pile to it's base
+		 *
+		 * @param {Scene} scene The scene we're being reset into
+		 */
 		reset(scene) {
 			this.canvas.width = scene._el.clientWidth;
 			this.canvas.height = Math.ceil(this.maxHeight) + 1;
@@ -292,6 +341,12 @@
 			this.draw();
 		}
 
+		/**
+		 * Sometimes we need to reposition ourselves if the window resized or
+		 * our container did. This lines the pile up along the bottom.
+		 *
+		 * @param {Scene} scene The scene we need to reposition for
+		 */
 		reposition(scene) {
 			this.offset =
 				scene._el == document.body
@@ -301,12 +356,19 @@
 			this.reset(scene);
 		}
 
+		/**
+		 * Last one out of Liberty City, burn it to the ground
+		 */
 		destroy() {
 			this.canvas.parentNode.removeChild(this.canvas);
 			delete this.pile;
 		}
 	}
 
+	/**
+	 * Our scene, which controls the rendering process and running each of the
+	 * animation ticks
+	 */
 	class Scene {
 		constructor(el) {
 			// Init
@@ -337,6 +399,9 @@
 			this.play();
 		}
 
+		/**
+		 * Draw the whole scene with all the snowflakes and the snowpile
+		 */
 		draw() {
 			this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 			// Fill the background because we don't have an alpha channel
@@ -349,6 +414,11 @@
 			return this;
 		}
 
+		/**
+		 * A.K.A. Tick
+		 *
+		 * Moves the scene's animation forward one frame
+		 */
 		step() {
 			for (const flake of this.snowflakes) {
 				flake.fall();
@@ -357,6 +427,14 @@
 			return this;
 		}
 
+		/**
+		 * Automatically adjust the number of snowflakes we have in our scene
+		 * based on how well we're rendering.
+		 *
+		 * Also logs if logging is enabled.
+		 *
+		 * @param {number} msPerFrameAvg Average # of ms to render a frame
+		 */
 		autoAdjustFlakeCount(msPerFrameAvg) {
 			const checkit = () => {
 				if (options.logTiming) {
@@ -433,6 +511,9 @@
 			}
 		}
 
+		/**
+		 * Pause the animation and rendering
+		 */
 		pause() {
 			if (this._paused) return this;
 
@@ -441,6 +522,9 @@
 			return this;
 		}
 
+		/**
+		 * Start or resume rendering and animating the scene
+		 */
 		play() {
 			if (!this._paused) return this;
 
@@ -467,6 +551,11 @@
 			return this;
 		}
 
+		/**
+		 * Trigger an automatic resize to realign the scene to the containing
+		 * element. This will wipe any snowflakes in the scene so we can
+		 * properly position them again.
+		 */
 		resize() {
 			this.pause();
 			// Now resize
@@ -495,6 +584,9 @@
 			return this.play();
 		}
 
+		/**
+		 * Destroy the whole scene
+		 */
 		destroy() {
 			this.pause();
 			this.canvas.parentNode.removeChild(this.canvas);
@@ -502,6 +594,12 @@
 			return this;
 		}
 
+		/**
+		 * Remove a snowflake from the scene. We often do this to
+		 * improve the framerate of the animation if it's too high.
+		 *
+		 * @param {Snowflake} flake The snowflake we want to remove
+		 */
 		removeFlake(flake) {
 			this.snowflakes.splice(this.snowflakes.indexOf(flake), 1);
 			this.flakeCount = this.snowflakes.length;
@@ -510,10 +608,8 @@
 	}
 
 	let scene;
-	/** Document Load function.
-	 *
-	 *     Handle logic start once page is loaded.
-	 *
+	/**
+	 * Initialize our page and scene
 	 */
 	function init() {
 		window.addEventListener("load", () => {
