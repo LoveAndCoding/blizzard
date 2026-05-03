@@ -461,8 +461,14 @@
 		 */
 		step(dtMs) {
 			const flakes = this.snowflakes;
-			for (let i = 0, n = flakes.length; i < n; i++) {
+			for (let i = 0; i < flakes.length; ) {
+				const lenBefore = flakes.length;
 				flakes[i].fall(dtMs);
+				if (flakes.length < lenBefore) {
+					// Flake at i was removed (swap-with-last); new occupant at i needs the same frame's tick.
+					continue;
+				}
+				i++;
 			}
 
 			return this;
