@@ -27,7 +27,7 @@
 	 *		"total"     (INT) : Total number of flakes to draw. Overrides min, and max.
 	 *		"min"       (INT) : Minimum number of flakes to draw. Overriden by total and minFPS (DEFAULT 0)
 	 *		"max"       (INT) : Maximum number of flakes to draw. Overriden by total. (DEFAULT Infinity)
-	 *		"starting"  (INT) : Number of flakes to start with. (DEFAULT 10)
+	 *		"starting"  (INT) : Number of flakes to start with. (DEFAULT 250)
 	 *		"lock"      (BOL) : Lock the number drawn to the value current number. (DEFAULT false)
 	 *		"pileUp"    (BOL) : Pile up the flakes at the bottom of the screen. (DEFAULT true)
 	 *		"sizes"     (INT) : Number of sizes to use when drawing the flakes. (DEFAULT 3)
@@ -38,11 +38,16 @@
 	 *		"maxFPS"    (INT) : Maximum number of frames per second to draw at. Overriden by FPS. (DEFAULT 60)
 	 *		"pauseBlur" (BOL) : Pause when the window looses focus. (DEFAULT true)
 	 *
+	 *	ACCESSIBILITY / PERF
+	 *		"respectReducedMotion" (BOL) : When true (default), no animation if the user prefers reduced motion.
+	 *
 	 *	CONTROLS
 	 *		NO ACTIVE OPTIONS YET
 	 *
 	 *	Debug
 	 *		"logTiming" (BOL) : Log the timing of drawing to the console. `console.log` is assumed. (DEFAULT false)
+	 *
+	 *	Note: After setOptions(), minFPS and maxFPS are stored as milliseconds per frame (1000 / fps), not as fps.
 	 *
 	 **/
 
@@ -60,6 +65,9 @@
 		maxFPS: 1000 / 60,
 		pauseBlur: true,
 
+		// Accessibility
+		respectReducedMotion: true,
+
 		// Controls
 		// To Be Added
 
@@ -68,6 +76,9 @@
 	};
 	const FLAKE_CACHE = [];
 	const TWOPI = Math.PI * 2;
+	/** ~60fps baseline; fall speed was historically `speed / 40` per frame at that rate */
+	const REFERENCE_FRAME_MS = 1000 / 60;
+	const MAX_STEP_MS = 100;
 
 	let options = Object.assign({}, DEFAULTS);
 
@@ -76,6 +87,17 @@
 		if (val === Infinity) return high;
 		else if (val === -Infinity) return low;
 		else return Math.max(low, Math.min(val, high));
+	}
+
+	function clearFlakeTextureCache() {
+		FLAKE_CACHE.length = 0;
+	}
+
+	function prefersReducedMotion() {
+		return (
+			typeof matchMedia !== "undefined" &&
+			matchMedia("(prefers-reduced-motion: reduce)").matches
+		);
 	}
 
 	/**
@@ -93,7 +115,7 @@
 
 			const rendered = document.createElement("canvas");
 			rendered.width = rendered.height = size;
-			const ctx = rendered.getContext("2d");
+			const ctx = rendered.getContext("2d", { alpha: false });
 			const halfSize = size / 2;
 
 			let rgb = 180;
@@ -154,9 +176,11 @@
 		 * @param {number} arcLocation Precomputed x-location
 		 */
 		willHitGround(arcLocation) {
-			const groundHeight =
-				this.scene.canvas.height -
-				this.scene.snowpile.getHeight(arcLocation + this.distance / 2);
+			const pile = this.scene.snowpile;
+			const groundOffset = pile
+				? pile.getHeight(arcLocation + this.distance / 2)
+				: 0;
+			const groundHeight = this.scene.canvas.height - groundOffset;
 			return this.y > groundHeight;
 		}
 
@@ -164,16 +188,16 @@
 		 * A.K.A. Tick
 		 *
 		 * This moves our animation forward one.
+		 * @param {number} dtMs elapsed time since last step in milliseconds
 		 */
-		fall() {
-			const ctx = this.scene.context;
-			const radius = this.distance / 2;
+		fall(dtMs) {
+			const frameScale = dtMs / REFERENCE_FRAME_MS;
 
 			this.arcLocation = this.calculateArcLocation();
-			this.y += this.speed / 40;
+			this.y += (this.speed / 40) * frameScale;
 
 			if (this.willHitGround(this.arcLocation)) {
-				if (options.pileUp) {
+				if (options.pileUp && this.scene.snowpile) {
 					this.scene.snowpile.addToPile(this);
 				}
 
@@ -206,9 +230,15 @@
 			this.offPage = false;
 			this.pile = [];
 			this.maxHeight = 0;
+			this._lastDrawnPileHeight = -1;
+			this._dirty = true;
 			scene._el.appendChild(this.canvas);
 
 			this.reset(scene);
+		}
+
+		markDirty() {
+			this._dirty = true;
 		}
 
 		/**
@@ -224,7 +254,12 @@
 		 * Draw the snowpile along the bottom
 		 */
 		draw() {
-			this.canvas.height = Math.ceil(this.maxHeight) + 1;
+			const targetH = Math.ceil(this.maxHeight) + 1;
+			if (targetH !== this._lastDrawnPileHeight) {
+				this.canvas.height = targetH;
+				this._lastDrawnPileHeight = targetH;
+			}
+
 			this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
 			this.ctx.fillStyle = "#FFFFFF";
@@ -241,6 +276,7 @@
 			this.ctx.lineTo(0, this.canvas.height);
 			this.ctx.closePath();
 			this.ctx.fill();
+			this._dirty = false;
 		}
 
 		/**
@@ -253,24 +289,12 @@
 		addToPile(flake) {
 			const floored = Math.floor(flake.x);
 			for (let d = -flake.distance, dl = flake.distance; d <= dl; d++) {
-				if (floored + d > 0 && floored + d < this.pile.length) {
+				const idx = floored + d;
+				if (idx > 0 && idx < this.pile.length) {
 					const adding =
 						(flake.distance - Math.abs(d)) / flake.distance;
-					this.pile[floored + d] += adding;
-					this.maxHeight = Math.max(
-						this.pile[floored + d],
-						this.maxHeight,
-					);
-					if (isNaN(this.maxHeight))
-						console.log(
-							this.maxHeight,
-							floored,
-							flake,
-							this.pile.slice(
-								floored - flake.distance,
-								floored + flake.distance,
-							),
-						);
+					this.pile[idx] += adding;
+					this.maxHeight = Math.max(this.pile[idx], this.maxHeight);
 				}
 			}
 			// == Normalize for the surrounding area
@@ -320,6 +344,7 @@
 					this.pile[i] += (avg - this.pile[i]) / 6;
 				}
 			}
+			this.markDirty();
 		}
 
 		/**
@@ -328,6 +353,7 @@
 		 * @param {Scene} scene The scene we're being reset into
 		 */
 		reset(scene) {
+			this.maxHeight = 0;
 			this.canvas.width = scene._el.clientWidth;
 			this.canvas.height = Math.ceil(this.maxHeight) + 1;
 			for (let p = 0, pl = this.canvas.clientWidth; p <= pl; p++) {
@@ -336,8 +362,9 @@
 				);
 				this.maxHeight = Math.max(this.pile[p], this.maxHeight);
 			}
-			this.ctx = this.canvas.getContext("2d");
-
+			this.ctx = this.canvas.getContext("2d", { alpha: false });
+			this._lastDrawnPileHeight = -1;
+			this.markDirty();
 			this.draw();
 		}
 
@@ -382,6 +409,14 @@
 			this.deleteCount = 0;
 			this.iterationCheck = 100;
 			this._paused = true;
+			this._frozenByBlur = false;
+			this._reducedMotion =
+				options.respectReducedMotion !== false && prefersReducedMotion();
+
+			if (this._reducedMotion) {
+				this.flakeCount = 0;
+			}
+
 			// Setup Canvas
 			this.canvas = document.createElement("canvas");
 			this.canvas.className = "canvasElement";
@@ -392,11 +427,12 @@
 			el.appendChild(this.canvas);
 			this.context = this.canvas.getContext("2d", { alpha: false });
 
-			// Build snow pile
-			this.snowpile = new SnowPile(this);
-			this.resize();
+			// Build snow pile (skipped when reduced motion — saves layout + pile simulation)
+			this.snowpile = this._reducedMotion ? null : new SnowPile(this);
+			this.snowflakes = [];
+			this._lastFrameTime = 0;
 
-			this.play();
+			this.resize();
 		}
 
 		/**
@@ -407,10 +443,13 @@
 			// Fill the background because we don't have an alpha channel
 			this.context.fillStyle = "#102d3a";
 			this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
-			for (const flake of this.snowflakes) {
-				flake.draw();
+			const flakes = this.snowflakes;
+			for (let i = 0, n = flakes.length; i < n; i++) {
+				flakes[i].draw();
 			}
-			this.snowpile.draw();
+			if (this.snowpile && this.snowpile._dirty) {
+				this.snowpile.draw();
+			}
 			return this;
 		}
 
@@ -418,10 +457,12 @@
 		 * A.K.A. Tick
 		 *
 		 * Moves the scene's animation forward one frame
+		 * @param {number} dtMs elapsed time since last step in milliseconds
 		 */
-		step() {
-			for (const flake of this.snowflakes) {
-				flake.fall();
+		step(dtMs) {
+			const flakes = this.snowflakes;
+			for (let i = 0, n = flakes.length; i < n; i++) {
+				flakes[i].fall(dtMs);
 			}
 
 			return this;
@@ -527,16 +568,23 @@
 		 */
 		play() {
 			if (!this._paused) return this;
+			if (this._reducedMotion) return this;
 
 			let stepcount = 0;
 			let totaldiff = 0;
 			this._paused = false;
-			const next = () => {
-				const start = new Date();
+			this._lastFrameTime = performance.now();
+
+			const next = (now) => {
+				const rawDt = now - this._lastFrameTime;
+				this._lastFrameTime = now;
+				const dtMs = Math.min(Math.max(rawDt, 0), MAX_STEP_MS);
+
+				const start = performance.now();
 				this.draw();
-				this.step();
+				this.step(dtMs);
 				stepcount++;
-				const diff = new Date() - start;
+				const diff = performance.now() - start;
 				totaldiff += diff;
 
 				if (!options.lock && stepcount % this.iterationCheck == 0) {
@@ -547,7 +595,7 @@
 				this.timer = window.requestAnimationFrame(next);
 			};
 
-			next();
+			this.timer = window.requestAnimationFrame(next);
 			return this;
 		}
 
@@ -567,8 +615,6 @@
 			this.canvas.height = this.e_height;
 			this.canvas.width = this.e_width;
 
-			for (let s in this.snowflakes) delete this.snowflakes[s];
-
 			this.snowflakes = [];
 
 			for (let s = 0; s < this.flakeCount; s++) {
@@ -577,10 +623,31 @@
 					Math.random() * this.e_height,
 					this,
 				);
-				sn.draw();
 				this.snowflakes.push(sn);
 			}
-			this.snowpile.reposition(this);
+			if (this.snowpile) {
+				this.snowpile.reposition(this);
+			}
+
+			if (this._reducedMotion) {
+				this._paused = true;
+				this.context.clearRect(
+					0,
+					0,
+					this.canvas.width,
+					this.canvas.height,
+				);
+				this.context.fillStyle = "#102d3a";
+				this.context.fillRect(
+					0,
+					0,
+					this.canvas.width,
+					this.canvas.height,
+				);
+				return this;
+			}
+
+			this._lastFrameTime = performance.now();
 			return this.play();
 		}
 
@@ -590,7 +657,9 @@
 		destroy() {
 			this.pause();
 			this.canvas.parentNode.removeChild(this.canvas);
-			this.snowpile.destroy();
+			if (this.snowpile) {
+				this.snowpile.destroy();
+			}
 			return this;
 		}
 
@@ -601,31 +670,68 @@
 		 * @param {Snowflake} flake The snowflake we want to remove
 		 */
 		removeFlake(flake) {
-			this.snowflakes.splice(this.snowflakes.indexOf(flake), 1);
-			this.flakeCount = this.snowflakes.length;
+			const flakes = this.snowflakes;
+			const i = flakes.indexOf(flake);
+			if (i === -1) return;
+			const last = flakes.length - 1;
+			if (i !== last) {
+				flakes[i] = flakes[last];
+			}
+			flakes.pop();
+			this.flakeCount = flakes.length;
 			this.deleteCount--;
 		}
 	}
 
 	let scene;
+	let resizeRaf = 0;
+
 	/**
 	 * Initialize our page and scene
 	 */
-	function init() {
-		window.addEventListener("load", () => {
-			scene = new Scene(document.body);
-		});
-
-		window.addEventListener("resize", () => {
+	function scheduleResize() {
+		cancelAnimationFrame(resizeRaf);
+		resizeRaf = requestAnimationFrame(function() {
+			resizeRaf = 0;
 			if (scene) scene.resize();
+		});
+	}
+
+	function startScene() {
+		scene = new Scene(document.body);
+		if (typeof ResizeObserver !== "undefined" && scene._el) {
+			new ResizeObserver(scheduleResize).observe(scene._el);
+		}
+	}
+
+	function init() {
+		if (document.readyState === "complete") {
+			startScene();
+		} else {
+			window.addEventListener("load", startScene);
+		}
+
+		window.addEventListener("resize", scheduleResize, { passive: true });
+
+		document.addEventListener("visibilitychange", () => {
+			if (!scene) return;
+			if (document.hidden) {
+				scene.pause();
+			} else if (!scene._frozenByBlur) {
+				scene.play();
+			}
 		});
 
 		window.addEventListener("blur", () => {
 			if (scene && options.pauseBlur) {
+				scene._frozenByBlur = true;
 				scene.pause();
 
 				const focusFunc = () => {
-					scene.play();
+					scene._frozenByBlur = false;
+					if (!document.hidden) {
+						scene.play();
+					}
 					window.removeEventListener("focus", focusFunc);
 				};
 
@@ -637,6 +743,7 @@
 	// Expose our API so folks can control the snow, if they like
 	window.Snowfall = {
 		setOptions: function(opts) {
+			const prevSizes = options.sizes;
 			options = Object.assign({}, DEFAULTS, opts);
 
 			if (options.total) {
@@ -652,6 +759,10 @@
 			// Convert FPS to pre-computed vals
 			options.minFPS = 1000 / options.minFPS;
 			options.maxFPS = 1000 / options.maxFPS;
+
+			if (options.sizes !== prevSizes) {
+				clearFlakeTextureCache();
+			}
 		},
 		pause: function() {
 			if (scene) scene.pause();
