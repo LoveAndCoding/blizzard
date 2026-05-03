@@ -23,7 +23,7 @@ passing in an object with the following values set. Any value not set will use t
     "total"     (INT) : Total number of flakes to draw. Overrides min, and max.
     "min"       (INT) : Minimum number of flakes to draw. Overriden by total and minFPS (DEFAULT 0)
     "max"       (INT) : Maximum number of flakes to draw. Overriden by total. (DEFAULT Infinity)
-    "starting"  (INT) : Number of flakes to start with. (DEFAULT 10)
+    "starting"  (INT) : Number of flakes to start with. (DEFAULT 250)
     "lock"      (BOL) : Lock the number drawn to the value current number. (DEFAULT false)
     "pileUp"    (BOL) : Pile up the flakes at the bottom of the screen. (DEFAULT true)
     "sizes"     (INT) : Number of sizes to use when drawing the flakes. (DEFAULT 3)
@@ -34,6 +34,10 @@ passing in an object with the following values set. Any value not set will use t
     "minFPS"    (INT) : Minimum number of frames per second to draw at. Overriden by FPS, overrides min. (DEFAULT 0)
     "maxFPS"    (INT) : Maximum number of frames per second to draw at. Overriden by FPS. (DEFAULT 60)
     "pauseBlur" (BOL) : Pause when the window looses focus. (DEFAULT true)
+
+### Accessibility
+
+    "respectReducedMotion" (BOL) : When true (default), skip animation when the user prefers reduced motion.
 
 ### Debugging
 
